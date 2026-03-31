@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🎥 YouTube to Blog
 
 A Streamlit-powered app that converts any YouTube video into a well-structured blog post ✍️ and even generates an **AI image** for the blog using the best keywords.
@@ -60,3 +61,7 @@ docker build -t youtube-to-blog .
 docker run -p 8501:8501 youtube-to-blog
 ```
 
+=======
+# Youtube-transcript-blog
+An AI-powered tool that extracts YouTube transcripts and converts them into structured, SEO-optimized blog content.
+>>>>>>> da7bdcecdaa77767b807cc5fbb31895b1d812929
