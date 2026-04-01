@@ -37,6 +37,7 @@ for k, v in [
     ("blog_tone", "Professional"),
     ("thumb_url", None),
     ("video_title", ""),
+    ("hashtags", []),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -566,6 +567,7 @@ def load_history():
                 "word_count": word_count,
                 "language": meta.get("language", "English"),
                 "tone": meta.get("tone", "Professional"),
+                "hashtags": meta.get("hashtags", []),
                 "read_time": max(1, word_count // 200),
             })
         except:
@@ -585,10 +587,38 @@ def get_thumb_b64(img_path: str) -> str:
     except:
         return ""
 
-def save_meta(ts: str, language: str, tone: str):
+def save_meta(ts: str, language: str, tone: str, hashtags: list = None):
     meta_fn = f"meta_{ts}.json"
+    meta_data = {"language": language, "tone": tone}
+    if hashtags:
+        meta_data["hashtags"] = hashtags
     with open(os.path.join(SAVE_DIR, meta_fn), "w", encoding="utf-8") as f:
-        json.dump({"language": language, "tone": tone}, f)
+        json.dump(meta_data, f)
+
+def generate_hashtags(blog_content: str, blog_title: str, llm) -> list:
+    """Generate relevant hashtags for the blog post using Gemini."""
+    try:
+        prompt = f"""Based on this blog post, generate 10-15 relevant, trending hashtags.
+
+Blog Title: {blog_title}
+
+Blog Content (first 1000 chars):
+{blog_content[:1000]}
+
+Requirements:
+- Return ONLY hashtags, one per line
+- Start each with #
+- No explanations or extra text
+- Mix popular and niche hashtags
+- Make them relevant to the content
+- Keep them concise (2-3 words max per hashtag)"""
+        
+        response = llm.invoke(prompt)
+        hashtags = [tag.strip() for tag in response.content.split('\n') if tag.strip().startswith('#')]
+        return hashtags[:15]  # Return max 15 hashtags
+    except Exception as e:
+        st.warning(f"⚠️ Hashtag generation skipped: {e}")
+        return []
 
 TONE_MAP = {
     "Professional":      "formal, authoritative, and polished",
@@ -741,6 +771,16 @@ if st.session_state.page == "history":
               <div class="schip">🕐 <strong>{vb["ts_label"]}</strong></div>
             </div>
             """, unsafe_allow_html=True)
+
+            # Hashtags
+            if vb.get("hashtags"):
+                hashtags_html = '<div style="margin-top:14px;padding:12px 14px;background:' + CARD2 + ';border:1px solid ' + BORDER_S + ';border-radius:12px">'
+                hashtags_html += '<div style="color:' + MUTED + ';font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">🏷️ Hashtags</div>'
+                hashtags_html += '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+                for tag in vb["hashtags"]:
+                    hashtags_html += f'<span style="background:' + CHIP + ';border:1px solid ' + CHIP_B + ';color:' + TEXT2 + ';padding:4px 10px;border-radius:100px;font-size:11px;font-weight:500;cursor:pointer" onclick="navigator.clipboard.writeText(\'{tag}\')">{tag}</span>'
+                hashtags_html += '</div></div>'
+                st.markdown(hashtags_html, unsafe_allow_html=True)
 
             # Blog content in tabs
             tab_preview, tab_raw = st.tabs(["📖 Preview", "📝 Raw Markdown"])
@@ -1010,13 +1050,16 @@ Requirements:
 - Make it engaging and publication-ready"""
                     response = llm.invoke(prompt)
                     blog_content = response.content
+                    
+                    # Generate hashtags
+                    title_match = re.search(r'^#\s+(.+)', blog_content, re.MULTILINE)
+                    blog_title = title_match.group(1) if title_match else "Blog Post"
+                    hashtags = generate_hashtags(blog_content, blog_title, llm)
 
                 cover_image = None
                 with st.spinner("🎨 Generating cover image with Imagen 4.0..."):
                     steps_ph.markdown(render_steps(active="Cover", done=["Transcript","Context","Blog"]), unsafe_allow_html=True)
                     try:
-                        title_match = re.search(r'^#\s+(.+)', blog_content, re.MULTILINE)
-                        blog_title  = title_match.group(1) if title_match else "Blog Post"
                         gc = genai.Client(api_key=GEMINI_API_KEY)
                         img_resp = gc.models.generate_images(
                             model="imagen-4.0-generate-001",
@@ -1034,7 +1077,7 @@ Requirements:
                 blog_fn = f"blog_{ts}.md"
                 with open(os.path.join(SAVE_DIR, blog_fn), "w", encoding="utf-8") as f:
                     f.write(blog_content)
-                save_meta(ts, blog_language, blog_tone)
+                save_meta(ts, blog_language, blog_tone, hashtags)
                 load_history.clear()  # invalidate cache so history shows new blog
 
                 cover_bytes, img_fn = None, None
@@ -1052,6 +1095,7 @@ Requirements:
                 st.session_state.word_count    = word_count
                 st.session_state.blog_language = blog_language
                 st.session_state.blog_tone     = blog_tone
+                st.session_state.hashtags      = hashtags
 
                 steps_ph.markdown(render_steps(done=["Transcript","Context","Blog","Cover","Done"]), unsafe_allow_html=True)
 
@@ -1101,6 +1145,16 @@ if st.session_state.blog_content:
       <div class="schip">🎨 <strong>{bt}</strong></div>
     </div>
     """, unsafe_allow_html=True)
+
+    # Hashtags section
+    if st.session_state.hashtags:
+        hashtags_html = '<div style="margin-top:16px;padding:14px 16px;background:' + CARD2 + ';border:1px solid ' + BORDER_S + ';border-radius:12px">'
+        hashtags_html += '<div style="color:' + MUTED + ';font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">🏷️ Suggested Hashtags</div>'
+        hashtags_html += '<div style="display:flex;flex-wrap:wrap;gap:8px">'
+        for tag in st.session_state.hashtags:
+            hashtags_html += f'<span style="background:' + CHIP + ';border:1px solid ' + CHIP_B + ';color:' + TEXT2 + ';padding:6px 12px;border-radius:100px;font-size:12px;font-weight:500;cursor:pointer" onclick="navigator.clipboard.writeText(\'{tag}\')">{tag}</span>'
+        hashtags_html += '</div></div>'
+        st.markdown(hashtags_html, unsafe_allow_html=True)
 
     # Result card
     st.markdown('<div class="rcard">', unsafe_allow_html=True)
