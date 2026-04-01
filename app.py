@@ -1009,7 +1009,7 @@ if generate_btn:
                 with st.spinner("📥 Fetching transcript..."):
                     steps_ph.markdown(render_steps(active="Transcript"), unsafe_allow_html=True)
                     data = fetch_transcript_with_proxy(vid)
-                    full_text = " ".join([e['text'] for e in data])
+                    full_text = " ".join([e.text for e in data])
                     word_count = len(full_text.split())
 
                 with st.spinner("🧠 Building semantic context..."):
