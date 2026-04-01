@@ -22,7 +22,7 @@ st.set_page_config(
 
 # ── SESSION DEFAULTS ──
 for k, v in [
-    ("dark_mode", True),
+    ("dark_mode", False),
     ("page", "generate"),          # "generate" | "history"
     ("blog_content", None),
     ("cover_bytes", None),
@@ -38,15 +38,7 @@ for k, v in [
         st.session_state[k] = v
 
 # ── HANDLE NAV QUERY PARAMS EARLY (before theme tokens are set) ──
-_qp_early = st.query_params
-if "nav" in _qp_early:
-    _nav_val_early = _qp_early["nav"]
-    st.query_params.clear()
-    if _nav_val_early == "theme":
-        st.session_state.dark_mode = not st.session_state.dark_mode
-    elif _nav_val_early in ("generate", "history"):
-        st.session_state.page = _nav_val_early
-    st.rerun()
+# (removed — nav now handled via session_state buttons directly)
 
 dark = st.session_state.dark_mode
 
@@ -241,6 +233,14 @@ html,body,[class*="css"]{{font-family:'Inter',sans-serif!important}}
 }}
 .stTabs [data-baseweb="tab-highlight"]{{display:none!important}}
 .stTabs [data-baseweb="tab-border"]{{display:none!important}}
+
+/* ── RADIO BUTTONS ── */
+div[data-testid="stRadio"] label p {{
+  color: {TEXT} !important;
+}}
+div[data-testid="stRadio"] label span {{
+  color: {TEXT} !important;
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -481,8 +481,9 @@ def render_steps(active=None, done=None):
         dots += f'<div class="{cls}"><div class="step-dot">{sym}</div><div class="step-lbl">{lbl}</div></div>'
     return f'<div class="steps-card"><div class="steps-inner"><div class="steps-line"></div>{dots}</div></div>'
 
+@st.cache_data(ttl=60, show_spinner=False)
 def load_history():
-    """Return list of dicts with blog metadata, newest first."""
+    """Return list of dicts with blog metadata, newest first. Cached for 60s."""
     items = []
     for fn in sorted(os.listdir(SAVE_DIR), reverse=True):
         if not fn.endswith(".md"):
@@ -524,6 +525,19 @@ def load_history():
             pass
     return items
 
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_thumb_b64(img_path: str) -> str:
+    """Resize image to thumbnail and return base64 — cached per path."""
+    try:
+        img = Image.open(img_path)
+        img.thumbnail((480, 270))
+        buf = io.BytesIO()
+        img.save(buf, format="WEBP", quality=70)
+        return base64.b64encode(buf.getvalue()).decode()
+    except:
+        return ""
+
 def save_meta(ts: str, language: str, tone: str):
     meta_fn = f"meta_{ts}.json"
     with open(os.path.join(SAVE_DIR, meta_fn), "w", encoding="utf-8") as f:
@@ -549,65 +563,87 @@ if not GEMINI_API_KEY:
 hist_count = len([f for f in os.listdir(SAVE_DIR) if f.endswith(".md")])
 is_gen  = st.session_state.page == "generate"
 is_hist = st.session_state.page == "history"
-_theme_icon  = "☀️" if dark else "🌙"
-_theme_label = "Light" if dark else "Dark"
+_theme_icon  = "🌙" if not dark else "☀️"
+_theme_label = "Dark" if not dark else "Light"
 
-gen_active_style  = f"color:#c4b5fd;border-bottom:2px solid #7c3aed;" if is_gen  else f"color:{TEXT2};border-bottom:2px solid transparent;"
-hist_active_style = f"color:#c4b5fd;border-bottom:2px solid #7c3aed;" if is_hist else f"color:{TEXT2};border-bottom:2px solid transparent;"
-
-_nav_item = """
-  display:inline-flex;align-items:center;gap:6px;
-  padding:6px 2px;font-size:13px;font-weight:600;
-  cursor:pointer;background:none;border:none;
-  border-left:none;border-right:none;border-top:none;
-  font-family:'Inter',sans-serif;
-  transition:color .2s;text-decoration:none;
-  padding-bottom:4px;
-"""
+# ── NAVBAR CSS ──
+_gen_active_css  = f"background:rgba(124,58,237,.1)!important;border-color:#7c3aed!important;color:#7c3aed!important;" if is_gen  else ""
+_hist_active_css = f"background:rgba(124,58,237,.1)!important;border-color:#7c3aed!important;color:#7c3aed!important;" if is_hist else ""
 
 st.markdown(f"""
 <style>
-.nav-item:hover {{ color:{TEXT} !important; }}
+/* ── ALL NAV BUTTONS — target by wrapper class ── */
+.nav-col .stButton>button,
+.nav-btn-active .stButton>button {{
+  height:38px!important;
+  padding:0 18px!important;
+  font-size:13px!important;
+  font-weight:600!important;
+  border-radius:10px!important;
+  border:1.5px solid {BORDER_S}!important;
+  background:transparent!important;
+  color:{TEXT2}!important;
+  box-shadow:none!important;
+  font-family:'Inter',sans-serif!important;
+  transition:all .18s ease!important;
+  white-space:nowrap!important;
+  width:100%!important;
+  line-height:1!important;
+}}
+.nav-col .stButton>button:hover,
+.nav-btn-active .stButton>button:hover {{
+  border-color:#7c3aed!important;
+  color:#7c3aed!important;
+  background:rgba(124,58,237,.07)!important;
+}}
+.nav-btn-active .stButton>button {{
+  background:rgba(124,58,237,.1)!important;
+  border-color:#7c3aed!important;
+  color:#7c3aed!important;
+}}
 </style>
-<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 0 0;">
-  <!-- Logo -->
-  <div class="nav-logo">
-    <div class="nav-icon">
-      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-        <polygon points="4,3 4,17 16,10" fill="white"/>
-      </svg>
-    </div>
-    <span class="nav-title">VidBlog <span>AI</span></span>
-  </div>
-  <!-- Nav links (hidden forms for page switching) -->
-  <div style="display:flex;align-items:center;gap:28px;">
-    <form action="" method="get" style="margin:0">
-      <button name="nav" value="generate" class="nav-item"
-        style="{_nav_item}{gen_active_style}">
-        ✨ Generate
-      </button>
-    </form>
-    <form action="" method="get" style="margin:0">
-      <button name="nav" value="history" class="nav-item"
-        style="{_nav_item}{hist_active_style}">
-        📂 History
-        <span style="background:{TAG_BG};border:1px solid {TAG_BR};color:{TAG_C};
-          font-size:10px;font-weight:700;padding:1px 7px;border-radius:100px;
-          margin-left:2px;">{hist_count}</span>
-      </button>
-    </form>
-    <form action="" method="get" style="margin:0">
-      <button name="nav" value="theme" class="nav-item"
-        style="{_nav_item}color:{TEXT2};border-bottom:2px solid transparent;">
-        {_theme_icon} {_theme_label}
-      </button>
-    </form>
-  </div>
-</div>
-<div style="height:1px;background:{BORDER_S};margin:10px 0 0"></div>
 """, unsafe_allow_html=True)
 
-# Nav query params are handled early at the top of the script
+# ── NAVBAR ── logo + buttons in one row
+_logo_col, _c2, _c3, _c4 = st.columns([2.5, 1, 1, 1])
+
+with _logo_col:
+    st.markdown(f"""
+    <div style="display:flex;align-items:center;height:38px">
+      <div class="nav-logo">
+        <div class="nav-icon">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+            <polygon points="4,3 4,17 16,10" fill="white"/>
+          </svg>
+        </div>
+        <span class="nav-title">VidBlog <span>AI</span></span>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# push logo to left by using spacer; buttons go right
+with _c2:
+    st.markdown(f'<div class="nav-col{"  nav-btn-active" if is_gen else " nav-col"}">', unsafe_allow_html=True)
+    if st.button("✨ Generate", key="nav_gen", use_container_width=True):
+        st.session_state.page = "generate"
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with _c3:
+    st.markdown(f'<div class="nav-col{"  nav-btn-active" if is_hist else " nav-col"}">', unsafe_allow_html=True)
+    if st.button(f"📂 History ({hist_count})", key="nav_hist", use_container_width=True):
+        st.session_state.page = "history"
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with _c4:
+    st.markdown('<div class="nav-col">', unsafe_allow_html=True)
+    if st.button(f"{_theme_icon} {_theme_label}", key="nav_theme", use_container_width=True):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown(f'<div style="height:1px;background:{BORDER_S};margin:6px 0 0"></div>', unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════
@@ -689,13 +725,27 @@ if st.session_state.page == "history":
 
         else:
             # ── GRID VIEW ──
+            HIST_PAGE_SIZE = 10
+            if "hist_page" not in st.session_state:
+                st.session_state.hist_page = 0
+
+            total = len(history)
+            total_pages = max(1, (total + HIST_PAGE_SIZE - 1) // HIST_PAGE_SIZE)
+            # clamp page index after deletions
+            if st.session_state.hist_page >= total_pages:
+                st.session_state.hist_page = total_pages - 1
+
+            page_items = history[
+                st.session_state.hist_page * HIST_PAGE_SIZE :
+                (st.session_state.hist_page + 1) * HIST_PAGE_SIZE
+            ]
+
             # Render cards in 2-column grid using HTML
             cards_html = '<div class="hgrid">'
-            for item in history:
+            for item in page_items:
                 if item["img_path"]:
-                    with open(item["img_path"], "rb") as f:
-                        b64 = base64.b64encode(f.read()).decode()
-                    img_tag = f'<img class="hcard-img" src="data:image/png;base64,{b64}" alt="cover">'
+                    b64 = get_thumb_b64(item["img_path"])
+                    img_tag = f'<img class="hcard-img" src="data:image/webp;base64,{b64}" alt="cover">' if b64 else '<div class="hcard-img-placeholder">📝</div>'
                 else:
                     img_tag = '<div class="hcard-img-placeholder">📝</div>'
 
@@ -718,15 +768,30 @@ if st.session_state.page == "history":
             cards_html += '</div>'
             st.markdown(cards_html, unsafe_allow_html=True)
 
+            # Pagination controls
+            if total_pages > 1:
+                st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+                pg_cols = st.columns([1, 2, 1])
+                with pg_cols[0]:
+                    if st.button("← Prev", disabled=st.session_state.hist_page == 0, use_container_width=True, key="hist_prev"):
+                        st.session_state.hist_page -= 1
+                        st.rerun()
+                with pg_cols[1]:
+                    st.markdown(f"<div style='text-align:center;color:{MUTED};font-size:12px;padding-top:8px'>Page {st.session_state.hist_page+1} of {total_pages}</div>", unsafe_allow_html=True)
+                with pg_cols[2]:
+                    if st.button("Next →", disabled=st.session_state.hist_page >= total_pages - 1, use_container_width=True, key="hist_next"):
+                        st.session_state.hist_page += 1
+                        st.rerun()
+
             # Action buttons per blog (below grid, using selectbox + buttons)
             st.markdown(f"<div style='height:20px'></div>", unsafe_allow_html=True)
             st.markdown(f'<div style="color:{MUTED};font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">🔧 Manage Blogs</div>', unsafe_allow_html=True)
 
-            blog_titles = [f"{i+1}. {(h['title'][:50]+'…') if len(h['title'])>50 else h['title']}" for i, h in enumerate(history)]
-            selected_idx = st.selectbox("Select a blog", options=range(len(history)),
+            blog_titles = [f"{i+1}. {(h['title'][:50]+'…') if len(h['title'])>50 else h['title']}" for i, h in enumerate(page_items)]
+            selected_idx = st.selectbox("Select a blog", options=range(len(page_items)),
                 format_func=lambda i: blog_titles[i], label_visibility="collapsed")
 
-            selected = history[selected_idx]
+            selected = page_items[selected_idx]
             act1, act2, act3 = st.columns(3)
 
             with act1:
@@ -751,6 +816,8 @@ if st.session_state.page == "history":
                         meta_path = selected["path"].replace("blog_", "meta_").replace(".md", ".json")
                         if os.path.exists(meta_path):
                             os.remove(meta_path)
+                        load_history.clear()
+                        get_thumb_b64.clear()
                         st.success("Blog deleted.")
                         st.rerun()
                     except Exception as de:
@@ -775,10 +842,7 @@ st.markdown(f"""
   <div class="hero-title">
     <span class="g1">YouTube</span> to <span class="g2">Blog Post</span>
   </div>
-  <p class="hero-sub">
-    Paste any YouTube URL and get a fully structured,
-    publication-ready blog post in seconds.
-  </p>
+ 
   <div class="hero-tags">
     <span class="hero-tag">⚡ Gemini 2.5 Flash</span>
     <span class="hero-tag">🎨 Imagen 4.0</span>
@@ -826,13 +890,15 @@ if video_url.strip():
 st.markdown('<div class="fdivider"></div>', unsafe_allow_html=True)
 st.markdown('<div class="fsublabel">⚙️ &nbsp;Customize Output</div>', unsafe_allow_html=True)
 
-c1, c2 = st.columns(2)
-with c1:
-    blog_language = st.selectbox("🌐 Language",
-        ["English","Urdu","Hindi","French","Spanish","Arabic","German","Portuguese","Turkish","Bengali"])
-with c2:
-    blog_tone = st.selectbox("🎨 Tone",
-        ["Professional","Casual & Friendly","Educational","Storytelling","Technical","Persuasive"])
+st.markdown(f"<p style='color:{TEXT};font-weight:700;margin-bottom:4px'>🌐 Language</p>", unsafe_allow_html=True)
+blog_language = st.radio("Language", 
+    ["English","Urdu","Hindi","French","Spanish","Arabic","German","Portuguese","Turkish","Bengali"],
+    horizontal=True, label_visibility="collapsed")
+
+st.markdown(f"<p style='color:{TEXT};font-weight:700;margin-bottom:4px'>🎨 Tone</p>", unsafe_allow_html=True)
+blog_tone = st.radio("Tone",
+    ["Professional","Casual & Friendly","Educational","Storytelling","Technical","Persuasive"],
+    horizontal=True, label_visibility="collapsed")
 
 st.markdown('<div class="fdivider"></div>', unsafe_allow_html=True)
 st.markdown('<div class="gen-btn">', unsafe_allow_html=True)
@@ -926,6 +992,7 @@ Requirements:
                 with open(os.path.join(SAVE_DIR, blog_fn), "w", encoding="utf-8") as f:
                     f.write(blog_content)
                 save_meta(ts, blog_language, blog_tone)
+                load_history.clear()  # invalidate cache so history shows new blog
 
                 cover_bytes, img_fn = None, None
                 if cover_image:
@@ -1013,17 +1080,16 @@ if st.session_state.blog_content:
     tab_prev, tab_raw = st.tabs(["📖 Preview", "📝 Raw Markdown"])
 
     with tab_prev:
-        # Copy button
+        # Copy button — keep blog content out of f-string to avoid brace conflicts
         safe = bc.replace("\\","\\\\").replace("`","\\`").replace("'","\\'").replace("\n","\\n")
-        st.markdown(f"""
-        <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
-          <button class="cpbtn"
-            onclick="navigator.clipboard.writeText(`{safe}`).then(()=>{{
-              this.innerHTML='✅ Copied!';
-              setTimeout(()=>this.innerHTML='📋 Copy Blog',2200);
-            }})">📋 Copy Blog</button>
-        </div>
-        """, unsafe_allow_html=True)
+        copy_btn_html = (
+            '<div style="display:flex;justify-content:flex-end;margin-bottom:14px">'
+            '<button class="cpbtn" onclick="navigator.clipboard.writeText(`'
+            + safe +
+            '`).then(()=>{this.innerHTML=\'✅ Copied!\';setTimeout(()=>this.innerHTML=\'📋 Copy Blog\',2200);})">'
+            '📋 Copy Blog</button></div>'
+        )
+        st.markdown(copy_btn_html, unsafe_allow_html=True)
         st.markdown('<div class="blog">', unsafe_allow_html=True)
         st.markdown(bc)
         st.markdown('</div>', unsafe_allow_html=True)
