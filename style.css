@@ -1,0 +1,178 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
+
+#MainMenu, footer, header { visibility: hidden; }
+[data-testid="stSidebar"] { display: none !important; }
+[data-testid="collapsedControl"] { display: none !important; }
+
+.block-container {
+  padding: 1.5rem 2rem 3rem !important;
+  max-width: 1100px !important;
+  margin: 0 auto !important;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ── INPUT ── */
+.stTextInput label { display: none !important; }
+.stTextInput > div > div > input {
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  font-size: 13px !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* ── SELECTBOX ── */
+[data-baseweb="select"] > div { border-radius: 8px !important; font-size: 13px !important; }
+[data-baseweb="popover"] ul { border-radius: 8px !important; padding: 4px !important; }
+[role="option"] { border-radius: 6px !important; font-size: 13px !important; padding: 8px 12px !important; }
+
+/* ── RADIO ── */
+div[data-testid="stRadio"] > div {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  gap: 2px 6px !important;
+}
+div[data-testid="stRadio"] label {
+  border-radius: 0 !important;
+  padding: 3px 4px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  background: transparent !important;
+  border: none !important;
+}
+div[data-testid="stRadio"] label p { font-size: 12px !important; font-weight: 500 !important; }
+div[data-testid="stRadio"] input[type="radio"] {
+  width: 13px !important; height: 13px !important;
+  accent-color: #7c3aed !important;
+}
+
+/* ── GENERATE BUTTON (primary) ── */
+.stButton > button[kind="primary"] {
+  background: #0f172a !important;
+  color: #fff !important;
+  border: none !important;
+}
+.stButton > button[kind="primary"] p {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+.stButton > button[kind="primary"]:hover {
+  background: #1e293b !important;
+  border: none !important;
+}
+.stButton > button[kind="primary"]:hover p {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+.stButton > button {
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  transition: all .2s !important;
+}
+.stDownloadButton > button {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  width: 100% !important;
+  padding: 8px 12px !important;
+}
+
+/* ── TABS ── */
+.stTabs [data-baseweb="tab-list"] {
+  border-radius: 8px !important;
+  padding: 3px !important;
+  gap: 2px !important;
+}
+.stTabs [data-baseweb="tab"] {
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 6px 14px !important;
+  border: none !important;
+}
+.stTabs [aria-selected="true"] {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5) !important;
+  color: #fff !important;
+}
+.stTabs [data-baseweb="tab-highlight"],
+.stTabs [data-baseweb="tab-border"] { display: none !important; }
+
+/* ── MISC ── */
+.stAlert { border-radius: 8px !important; font-size: 13px !important; }
+.stSpinner > div { border-top-color: #7c3aed !important; }
+.stImage img { border-radius: 10px !important; }
+
+/* ── BLOG CONTENT ── */
+.blog { font-size: 14px; line-height: 1.85; }
+.blog h1 { font-size: 22px !important; font-weight: 800 !important; margin: 0 0 14px !important; }
+.blog h2 { font-size: 17px !important; font-weight: 700 !important; margin: 20px 0 8px !important; padding-bottom: 6px !important; }
+.blog h3 { font-size: 14px !important; font-weight: 600 !important; margin: 14px 0 6px !important; }
+.blog p  { margin-bottom: 12px !important; }
+.blog ul, .blog ol { padding-left: 18px !important; margin-bottom: 12px !important; }
+.blog li { margin-bottom: 4px !important; }
+.blog blockquote {
+  border-left: 3px solid #7c3aed !important;
+  padding: 8px 14px !important;
+  margin: 14px 0 !important;
+  border-radius: 0 6px 6px 0 !important;
+  font-style: italic !important;
+}
+.blog code {
+  background: rgba(124,58,237,.1) !important;
+  color: #c4b5fd !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+}
+
+/* ── HISTORY GRID ── */
+.hcard { border-radius: 12px; overflow: hidden; transition: transform .2s, box-shadow .2s; cursor: pointer; margin-bottom: 4px; }
+.hcard:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(124,58,237,.15); }
+.hcard-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+.hcard-img-placeholder { width: 100%; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+.hcard-body { padding: 12px 14px 10px; }
+.hcard-title { font-size: 13px; font-weight: 700; line-height: 1.4; margin-bottom: 6px; }
+.hcard-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 7px; }
+.hcard-chip { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 100px; }
+.hcard-preview { font-size: 11.5px; line-height: 1.6; max-height: 48px; overflow: hidden; }
+
+/* Open button styled as card footer */
+div[data-testid="column"] .stButton > button[kind="secondary"] {
+  border-radius: 0 0 12px 12px !important;
+  border-top: none !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  width: 100% !important;
+  margin-top: -4px !important;
+}
+
+/* ── STEPS ── */
+.steps-card { border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; }
+.steps-inner { display: flex; align-items: flex-start; justify-content: space-between; position: relative; }
+.steps-line { position: absolute; top: 13px; left: 13px; right: 13px; height: 1px; z-index: 0; }
+.step { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1; position: relative; z-index: 1; }
+.step-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+.step.active .step-dot { box-shadow: 0 0 0 4px rgba(124,58,237,.15); }
+.step-lbl { font-size: 8px; font-weight: 700; text-align: center; white-space: nowrap; letter-spacing: .5px; text-transform: uppercase; }
+
+/* ── DELETE / VIEW BUTTONS ── */
+.del-btn .stButton > button {
+  background: rgba(239,68,68,.08) !important;
+  border: 1.5px solid rgba(239,68,68,.2) !important;
+  color: #f87171 !important;
+}
+.del-btn .stButton > button:hover { background: rgba(239,68,68,.15) !important; }
+.view-btn .stButton > button {
+  background: rgba(124,58,237,.1) !important;
+  border: 1.5px solid rgba(124,58,237,.25) !important;
+  color: #c4b5fd !important;
+}
