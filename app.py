@@ -98,10 +98,12 @@ div[data-testid="stRadio"] label p {{ color:{TEXT2} !important; }}
 .stTabs [data-baseweb="tab-list"] {{ background:{CARD} !important; border:1px solid {BORDER} !important; }}
 .stTabs [data-baseweb="tab"] {{ color:{TEXT2} !important; }}
 .stSpinner p {{ color:{TEXT2} !important; }}
-.blog {{ color:{TEXT2}; }}
+.blog {{ color:{TEXT2} !important; }}
 .blog h1, .blog h2, .blog h3 {{ color:{TEXT} !important; }}
+.blog p, .blog li, .blog td {{ color:{TEXT2} !important; }}
 .blog h2 {{ border-bottom:1px solid {BORDER} !important; }}
 .blog blockquote {{ background:rgba(124,58,237,.06) !important; color:{MUTED} !important; }}
+.blog strong {{ color:{TEXT} !important; }}
 .steps-card {{ background:{CARD}; border:1px solid {BORDER}; }}
 .steps-line {{ background:{BORDER}; }}
 .step-dot {{ background:{CHIP}; border:1.5px solid {CHIP_B}; color:{MUTED}; }}
@@ -244,8 +246,9 @@ with logo_col:
             logo_b64 = base64.b64encode(lf.read()).decode()
         st.markdown(
             f'<div style="display:flex;align-items:center;height:38px">'
+            f'<a href="https://www.prabisha.com/" target="_blank" style="display:inline-flex;align-items:center">'
             f'<img src="data:image/png;base64,{logo_b64}" style="height:48px;object-fit:contain;{"filter:brightness(0) invert(1)" if dark else ""}">'
-            f'</div>',
+            f'</a></div>',
             unsafe_allow_html=True)
     else:
         st.markdown('<span style="font-size:16px;font-weight:800;color:#7c3aed">VidBlog AI</span>', unsafe_allow_html=True)
