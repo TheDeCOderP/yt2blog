@@ -10,6 +10,9 @@ from PIL import Image
 import io, re, os, datetime, base64
 import json
 import requests
+from docx import Document
+from docx.shared import Pt, RGBColor
+import markdown as md_lib
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -37,7 +40,6 @@ for k, v in [
     ("blog_tone", "Professional"),
     ("thumb_url", None),
     ("video_title", ""),
-    ("hashtags", []),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -57,8 +59,8 @@ if dark:
     BORDER    = "rgba(139,92,246,0.18)"
     BORDER_S  = "rgba(255,255,255,0.07)"
     TEXT      = "#f1f5f9"
-    TEXT2     = "#94a3b8"
-    MUTED     = "#475569"
+    TEXT2     = "#cbd5e1"
+    MUTED     = "#64748b"
     INPUT_BG  = "#0a0a1e"
     GRAD      = "radial-gradient(ellipse 120% 55% at 50% 0%, rgba(124,58,237,0.18) 0%, transparent 65%)"
     SHADOW    = "0 0 0 1px rgba(255,255,255,0.05), 0 24px 64px rgba(0,0,0,0.65)"
@@ -188,6 +190,19 @@ html,body,[class*="css"]{{font-family:'Inter',sans-serif!important}}
   transform:translateY(-2px)!important;
   box-shadow:0 14px 36px rgba(124,58,237,.55)!important;
 }}
+
+/* ── BUTTON TEXT COLOR FIX ── */
+.stButton>button p {{
+  color:{TEXT}!important;
+  -webkit-text-fill-color:{TEXT}!important;
+}}
+.stButton>button:hover p,
+.stButton>button:focus p,
+.stButton>button:active p {{
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
+}}
+{"/* dark mode: override Streamlit white button bg */.stButton>button{background:"+CARD+"!important;border-color:"+BORDER_S+"!important;}.stButton>button:hover{background:rgba(124,58,237,.22)!important;border-color:#7c3aed!important;}" if dark else ""}
 
 /* ── NAV ITEMS ── */
 .nav-item:hover {{ color:{TEXT} !important; }}
@@ -465,6 +480,38 @@ st.markdown(f"""
 SAVE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "outputs")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
+def md_to_html(md_text: str, title: str = "Blog") -> bytes:
+    body = md_lib.markdown(md_text, extensions=["extra", "nl2br"])
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>{title}</title>
+<style>body{{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.8;color:#1a1a1a}}
+h1{{font-size:2em;margin-bottom:.5em}}h2{{font-size:1.4em;margin-top:1.5em}}
+p{{margin-bottom:1em}}blockquote{{border-left:4px solid #7c3aed;padding:8px 16px;color:#555;margin:16px 0}}
+code{{background:#f3f0ff;padding:2px 6px;border-radius:4px}}</style>
+</head><body>{body}</body></html>"""
+    return html.encode("utf-8")
+
+def md_to_docx(md_text: str, title: str = "Blog") -> bytes:
+    doc = Document()
+    doc.core_properties.title = title
+    for line in md_text.split("\n"):
+        line = line.strip()
+        if line.startswith("### "):
+            doc.add_heading(line[4:], level=3)
+        elif line.startswith("## "):
+            doc.add_heading(line[3:], level=2)
+        elif line.startswith("# "):
+            doc.add_heading(line[2:], level=1)
+        elif line.startswith("- ") or line.startswith("* "):
+            doc.add_paragraph(line[2:], style="List Bullet")
+        elif line == "":
+            doc.add_paragraph("")
+        else:
+            doc.add_paragraph(line)
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
 def extract_video_id(url: str):
     for p in [r"(?:v=)([a-zA-Z0-9_-]{11})", r"(?:youtu\.be/)([a-zA-Z0-9_-]{11})",
               r"(?:embed/)([a-zA-Z0-9_-]{11})", r"(?:shorts/)([a-zA-Z0-9_-]{11})"]:
@@ -649,7 +696,7 @@ _hist_active_css = f"background:rgba(124,58,237,.1)!important;border-color:#7c3a
 
 st.markdown(f"""
 <style>
-/* ── ALL NAV BUTTONS — target by wrapper class ── */
+/* ── NAV BUTTONS BASE ── */
 .nav-col .stButton>button,
 .nav-btn-active .stButton>button {{
   height:38px!important;
@@ -658,25 +705,67 @@ st.markdown(f"""
   font-weight:600!important;
   border-radius:10px!important;
   border:1.5px solid {BORDER_S}!important;
-  background:transparent!important;
-  color:{TEXT2}!important;
+  background:{CARD}!important;
+  color:{TEXT}!important;
   box-shadow:none!important;
   font-family:'Inter',sans-serif!important;
-  transition:all .18s ease!important;
+  transition:border-color .18s,background .18s,color .18s,box-shadow .18s!important;
   white-space:nowrap!important;
   width:100%!important;
   line-height:1!important;
 }}
-.nav-col .stButton>button:hover,
-.nav-btn-active .stButton>button:hover {{
-  border-color:#7c3aed!important;
-  color:#7c3aed!important;
-  background:rgba(124,58,237,.07)!important;
+
+/* ── NAV BUTTON TEXT (Streamlit wraps in <p>) ── */
+.nav-col .stButton>button p,
+.nav-btn-active .stButton>button p {{
+  color:{TEXT}!important;
+  -webkit-text-fill-color:{TEXT}!important;
+  font-size:13px!important;
+  font-weight:600!important;
+  margin:0!important;
 }}
-.nav-btn-active .stButton>button {{
-  background:rgba(124,58,237,.1)!important;
+
+/* ── HOVER / FOCUS / ACTIVE ── */
+.nav-col .stButton>button:hover,
+.nav-col .stButton>button:focus,
+.nav-col .stButton>button:active {{
   border-color:#7c3aed!important;
-  color:#7c3aed!important;
+  background:rgba(124,58,237,.22)!important;
+  box-shadow:0 0 0 3px rgba(124,58,237,.15)!important;
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
+}}
+.nav-col .stButton>button:hover p,
+.nav-col .stButton>button:focus p,
+.nav-col .stButton>button:active p {{
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
+}}
+
+/* ── ACTIVE PAGE BUTTON ── */
+.nav-btn-active .stButton>button {{
+  background:rgba(124,58,237,.18)!important;
+  border-color:#7c3aed!important;
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
+}}
+.nav-btn-active .stButton>button p {{
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
+}}
+.nav-btn-active .stButton>button:hover,
+.nav-btn-active .stButton>button:focus,
+.nav-btn-active .stButton>button:active {{
+  background:rgba(124,58,237,.30)!important;
+  border-color:#a78bfa!important;
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
+}}
+.nav-btn-active .stButton>button:hover p,
+.nav-btn-active .stButton>button:focus p,
+.nav-btn-active .stButton>button:active p {{
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -685,36 +774,71 @@ st.markdown(f"""
 _logo_col, _c2, _c3, _c4 = st.columns([2.5, 1, 1, 1])
 
 with _logo_col:
-    st.markdown(f"""
-    <div style="display:flex;align-items:center;height:38px">
-      <div class="nav-logo">
-        <div class="nav-icon">
-          <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-            <polygon points="4,3 4,17 16,10" fill="white"/>
-          </svg>
+    _logo_path = os.path.join(os.path.dirname(__file__), "Prabisha_logo.png")
+    if os.path.exists(_logo_path):
+        with open(_logo_path, "rb") as _lf:
+            _logo_b64 = base64.b64encode(_lf.read()).decode()
+        _logo_html = '<div style="display:flex;align-items:center;gap:12px;height:38px"><img src="data:image/png;base64,' + _logo_b64 + '" style="height:52px;object-fit:contain;" alt="Prabisha Consulting"><span style="font-size:16px;font-weight:800;background:linear-gradient(90deg,#7c3aed,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.5px;white-space:nowrap">Video to Blog</span></div>'
+        st.markdown(_logo_html, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div style="display:flex;align-items:center;height:38px">
+          <div class="nav-logo">
+            <div class="nav-icon">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                <polygon points="4,3 4,17 16,10" fill="white"/>
+              </svg>
+            </div>
+            <span class="nav-title">VidBlog <span>AI</span></span>
+          </div>
         </div>
-        <span class="nav-title">VidBlog <span>AI</span></span>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
 # push logo to left by using spacer; buttons go right
 with _c2:
-    st.markdown(f'<div class="nav-col{"  nav-btn-active" if is_gen else " nav-col"}">', unsafe_allow_html=True)
+    _gen_bg = "rgba(124,58,237,.22)" if is_gen else CARD
+    _gen_bc = "#7c3aed" if is_gen else BORDER_S
+    _gen_tc = "#7c3aed" if is_gen else TEXT
+    st.markdown(f"""
+    <style>
+    #nav_gen_wrap button {{ background:{_gen_bg}!important; border:1.5px solid {_gen_bc}!important; height:38px!important; border-radius:10px!important; font-size:13px!important; font-weight:600!important; width:100%!important; }}
+    #nav_gen_wrap button p {{ color:{_gen_tc}!important; -webkit-text-fill-color:{_gen_tc}!important; }}
+    #nav_gen_wrap button:hover {{ background:rgba(124,58,237,.35)!important; border-color:#a78bfa!important; }}
+    #nav_gen_wrap button:hover p {{ color:#ffffff!important; -webkit-text-fill-color:#ffffff!important; }}
+    </style>
+    <div id="nav_gen_wrap">
+    """, unsafe_allow_html=True)
     if st.button("✨ Generate", key="nav_gen", width='stretch'):
         st.session_state.page = "generate"
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
 with _c3:
-    st.markdown(f'<div class="nav-col{"  nav-btn-active" if is_hist else " nav-col"}">', unsafe_allow_html=True)
-    if st.button(f"📂 History ({hist_count})", key="nav_hist", width='stretch'):
+    _hist_bg = "rgba(124,58,237,.22)" if is_hist else CARD
+    _hist_bc = "#7c3aed" if is_hist else BORDER_S
+    _hist_tc = "#7c3aed" if is_hist else TEXT
+    st.markdown(f"""
+    <style>
+    #nav_hist_wrap button {{ background:{_hist_bg}!important; border:1.5px solid {_hist_bc}!important; height:38px!important; border-radius:10px!important; font-size:13px!important; font-weight:600!important; width:100%!important; }}
+    #nav_hist_wrap button p {{ color:{_hist_tc}!important; -webkit-text-fill-color:{_hist_tc}!important; }}
+    #nav_hist_wrap button:hover {{ background:rgba(124,58,237,.35)!important; border-color:#a78bfa!important; }}
+    #nav_hist_wrap button:hover p {{ color:#ffffff!important; -webkit-text-fill-color:#ffffff!important; }}
+    </style>
+    <div id="nav_hist_wrap">
+    """, unsafe_allow_html=True)
+    if st.button(f"📂 History", key="nav_hist", width='stretch'):
         st.session_state.page = "history"
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
 with _c4:
-    st.markdown('<div class="nav-col">', unsafe_allow_html=True)
+    st.markdown(f"""
+    <style>
+    #nav_theme_wrap button {{ background:{CARD}!important; border:1.5px solid {BORDER_S}!important; height:38px!important; border-radius:10px!important; font-size:13px!important; font-weight:600!important; width:100%!important; }}
+    #nav_theme_wrap button:hover {{ background:rgba(124,58,237,.22)!important; border-color:#7c3aed!important; }}
+    </style>
+    <div id="nav_theme_wrap">
+    """, unsafe_allow_html=True)
     if st.button(f"{_theme_icon} {_theme_label}", key="nav_theme", width='stretch'):
         st.session_state.dark_mode = not st.session_state.dark_mode
         st.rerun()
@@ -778,7 +902,7 @@ if st.session_state.page == "history":
                 hashtags_html += '<div style="color:' + MUTED + ';font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">🏷️ Hashtags</div>'
                 hashtags_html += '<div style="display:flex;flex-wrap:wrap;gap:6px">'
                 for tag in vb["hashtags"]:
-                    hashtags_html += f'<span style="background:' + CHIP + ';border:1px solid ' + CHIP_B + ';color:' + TEXT2 + ';padding:4px 10px;border-radius:100px;font-size:11px;font-weight:500;cursor:pointer" onclick="navigator.clipboard.writeText(\'{tag}\')">{tag}</span>'
+                    hashtags_html += '<span style="background:' + CHIP + ';border:1px solid ' + CHIP_B + ';color:' + TEXT2 + ';padding:4px 10px;border-radius:100px;font-size:11px;font-weight:500;cursor:pointer" onclick="navigator.clipboard.writeText(\'' + tag + '\')">' + tag + '</span>'
                 hashtags_html += '</div></div>'
                 st.markdown(hashtags_html, unsafe_allow_html=True)
 
@@ -797,16 +921,26 @@ if st.session_state.page == "history":
             <div style="color:{MUTED};font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">⬇️ Download</div>
             """, unsafe_allow_html=True)
 
-            dl1, dl2 = st.columns(2)
-            with dl1:
-                st.download_button("📄 Blog (.md)", data=vb["content"],
+            _hbase = vb["fn"].replace(".md", "")
+            _has_img = vb["img_path"] and os.path.exists(vb["img_path"])
+            _cols = st.columns(4) if _has_img else st.columns(3)
+            with _cols[0]:
+                st.download_button("📄 .md", data=vb["content"],
                     file_name=vb["fn"], mime="text/markdown",
                     width='stretch', key="hist_dl_blog")
-            with dl2:
-                if vb["img_path"] and os.path.exists(vb["img_path"]):
+            with _cols[1]:
+                st.download_button("🌐 .html", data=md_to_html(vb["content"], _hbase),
+                    file_name=_hbase+".html", mime="text/html",
+                    width='stretch', key="hist_dl_html")
+            with _cols[2]:
+                st.download_button("📝 .docx", data=md_to_docx(vb["content"], _hbase),
+                    file_name=_hbase+".docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    width='stretch', key="hist_dl_docx")
+            if _has_img:
+                with _cols[3]:
                     with open(vb["img_path"], "rb") as imgf:
                         img_bytes = imgf.read()
-                    st.download_button("🖼️ Cover (.png)", data=img_bytes,
+                    st.download_button("🖼️ .png", data=img_bytes,
                         file_name=vb["img_fn"], mime="image/png",
                         width='stretch', key="hist_dl_img")
 
@@ -879,7 +1013,7 @@ if st.session_state.page == "history":
                 format_func=lambda i: blog_titles[i], label_visibility="collapsed")
 
             selected = page_items[selected_idx]
-            act1, act2, act3 = st.columns(3)
+            act1, act2, act3 = st.columns([1, 2, 1])
 
             with act1:
                 st.markdown('<div class="view-btn">', unsafe_allow_html=True)
@@ -889,9 +1023,20 @@ if st.session_state.page == "history":
                 st.markdown('</div>', unsafe_allow_html=True)
 
             with act2:
-                st.download_button("📄 Download .md", data=selected["content"],
-                    file_name=selected["fn"], mime="text/markdown",
-                    width='stretch', key="dl_sel_blog")
+                _sbase = selected["fn"].replace(".md", "")
+                dl_s1, dl_s2, dl_s3 = st.columns(3)
+                with dl_s1:
+                    st.download_button("📄 .md", data=selected["content"],
+                        file_name=selected["fn"], mime="text/markdown",
+                        width='stretch', key="dl_sel_md")
+                with dl_s2:
+                    st.download_button("🌐 .html", data=md_to_html(selected["content"], _sbase),
+                        file_name=_sbase+".html", mime="text/html",
+                        width='stretch', key="dl_sel_html")
+                with dl_s3:
+                    st.download_button("📝 .docx", data=md_to_docx(selected["content"], _sbase),
+                        file_name=_sbase+".docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        width='stretch', key="dl_sel_docx")
 
             with act3:
                 st.markdown('<div class="del-btn">', unsafe_allow_html=True)
@@ -927,21 +1072,17 @@ st.markdown(f"""
 <div class="hero">
   <div class="hero-badge">✦ &nbsp;AI POWERED</div>
   <div class="hero-title">
-    <span class="g1">YouTube</span> to <span class="g2">Blog Post</span>
+    <span class="g1">Video</span> to <span class="g2">Blog</span>
   </div>
  
   <div class="hero-tags">
-    <span class="hero-tag">⚡ Gemini 2.5 Flash</span>
-    <span class="hero-tag">🎨 Imagen 4.0</span>
-    <span class="hero-tag">🧠 RAG Pipeline</span>
+    <span class="hero-tag">⚡ Instant Blog Generation</span>
     <span class="hero-tag">🌐 10 Languages</span>
+    <span class="hero-tag">🎨 AI Cover Image</span>
+    <span class="hero-tag">📥 Download as Markdown</span>
   </div>
 </div>
 """, unsafe_allow_html=True)
-
-# STEPS
-steps_ph = st.empty()
-steps_ph.markdown(render_steps(), unsafe_allow_html=True)
 
 # FORM CARD
 st.markdown('<div class="fcard">', unsafe_allow_html=True)
@@ -952,7 +1093,7 @@ st.markdown(f"""
     <rect width="16" height="12" rx="2.5" fill="#FF0000"/>
     <polygon points="6.5,2.5 6.5,9.5 12,6" fill="white"/>
   </svg>
-  YouTube Video URL
+  Video URL
 </div>
 """, unsafe_allow_html=True)
 
@@ -998,8 +1139,9 @@ st.markdown('</div>', unsafe_allow_html=True)  # /fcard
 #  GENERATE LOGIC
 # ══════════════════════════════════════════
 if generate_btn:
+    steps_ph = st.empty()
     if not video_url.strip():
-        st.warning("⚠️ Please enter a YouTube URL first.")
+        st.warning("⚠️ Please enter a video URL first.")
     else:
         vid = extract_video_id(video_url)
         if not vid:
@@ -1152,7 +1294,7 @@ if st.session_state.blog_content:
         hashtags_html += '<div style="color:' + MUTED + ';font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">🏷️ Suggested Hashtags</div>'
         hashtags_html += '<div style="display:flex;flex-wrap:wrap;gap:8px">'
         for tag in st.session_state.hashtags:
-            hashtags_html += f'<span style="background:' + CHIP + ';border:1px solid ' + CHIP_B + ';color:' + TEXT2 + ';padding:6px 12px;border-radius:100px;font-size:12px;font-weight:500;cursor:pointer" onclick="navigator.clipboard.writeText(\'{tag}\')">{tag}</span>'
+            hashtags_html += '<span style="background:' + CHIP + ';border:1px solid ' + CHIP_B + ';color:' + TEXT2 + ';padding:6px 12px;border-radius:100px;font-size:12px;font-weight:500;cursor:pointer" onclick="navigator.clipboard.writeText(\'' + tag + '\')">' + tag + '</span>'
         hashtags_html += '</div></div>'
         st.markdown(hashtags_html, unsafe_allow_html=True)
 
@@ -1177,13 +1319,13 @@ if st.session_state.blog_content:
     tab_prev, tab_raw = st.tabs(["📖 Preview", "📝 Raw Markdown"])
 
     with tab_prev:
-        # Copy button — keep blog content out of f-string to avoid brace conflicts
-        safe = bc.replace("\\","\\\\").replace("`","\\`").replace("'","\\'").replace("\n","\\n")
+        # Copy button — store content in a JS variable to avoid HTML injection issues
+        safe = bc.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
         copy_btn_html = (
+            '<script>window._blogContent = `' + safe + '`;</script>'
             '<div style="display:flex;justify-content:flex-end;margin-bottom:14px">'
-            '<button class="cpbtn" onclick="navigator.clipboard.writeText(`'
-            + safe +
-            '`).then(()=>{this.innerHTML=\'✅ Copied!\';setTimeout(()=>this.innerHTML=\'📋 Copy Blog\',2200);})">'
+            '<button class="cpbtn" onclick="navigator.clipboard.writeText(window._blogContent)'
+            '.then(()=>{this.innerHTML=\'✅ Copied!\';setTimeout(()=>this.innerHTML=\'📋 Copy Blog\',2200);})">'
             '📋 Copy Blog</button></div>'
         )
         st.markdown(copy_btn_html, unsafe_allow_html=True)
@@ -1201,24 +1343,81 @@ if st.session_state.blog_content:
     text-transform:uppercase;margin-bottom:12px">⬇️ &nbsp;Download</div>
     """, unsafe_allow_html=True)
 
+    _base = bf.replace(".md", "")
     if cb:
-        d1, d2 = st.columns(2)
+        d1, d2, d3, d4 = st.columns(4)
         with d1:
-            st.download_button("📄 Blog (.md)", data=bc, file_name=bf,
+            st.download_button("📄 .md", data=bc, file_name=bf,
                 mime="text/markdown", width='stretch', key="dl_blog")
         with d2:
-            st.download_button("🖼️ Cover Image (.png)", data=cb, file_name=imf,
+            st.download_button("🌐 .html", data=md_to_html(bc, _base),
+                file_name=_base+".html", mime="text/html", width='stretch', key="dl_html")
+        with d3:
+            st.download_button("📝 .docx", data=md_to_docx(bc, _base),
+                file_name=_base+".docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                width='stretch', key="dl_docx")
+        with d4:
+            st.download_button("🖼️ .png", data=cb, file_name=imf,
                 mime="image/png", width='stretch', key="dl_img")
     else:
-        st.download_button("📄 Download Blog (.md)", data=bc, file_name=bf,
-            mime="text/markdown", width='stretch', key="dl_blog")
+        d1, d2, d3 = st.columns(3)
+        with d1:
+            st.download_button("📄 .md", data=bc, file_name=bf,
+                mime="text/markdown", width='stretch', key="dl_blog")
+        with d2:
+            st.download_button("🌐 .html", data=md_to_html(bc, _base),
+                file_name=_base+".html", mime="text/html", width='stretch', key="dl_html")
+        with d3:
+            st.download_button("📝 .docx", data=md_to_docx(bc, _base),
+                file_name=_base+".docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                width='stretch', key="dl_docx")
 
     st.markdown('</div>', unsafe_allow_html=True)  # /rcard
+
+    # Share buttons
+    _blog_title = st.session_state.get("video_title", "Check out this blog")
+    _share_text = f"{_blog_title} — generated with VidBlog AI"
+    _li_url  = f"https://www.linkedin.com/sharing/share-offsite/?url=https://vidblog.ai"
+    _tw_url  = f"https://twitter.com/intent/tweet?text={requests.utils.quote(_share_text)}"
+    _fb_url  = f"https://www.facebook.com/sharer/sharer.php?u=https://vidblog.ai&quote={requests.utils.quote(_share_text)}"
+    _wa_url  = f"https://api.whatsapp.com/send?text={requests.utils.quote(_share_text)}"
+
+    if "show_share" not in st.session_state:
+        st.session_state.show_share = False
+
+    st.markdown("<div style='margin-top:16px'>", unsafe_allow_html=True)
+    _scol, _ = st.columns([1, 3])
+    with _scol:
+        if st.button("🔗 Share", key="share_toggle", width='stretch'):
+            st.session_state.show_share = not st.session_state.show_share
+
+    if st.session_state.show_share:
+        st.markdown(f"""
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <a href="{_li_url}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:10px;background:#0a66c2;color:#fff;font-size:13px;font-weight:600;text-decoration:none;font-family:'Inter',sans-serif;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            LinkedIn
+          </a>
+          <a href="{_tw_url}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:10px;background:#000;color:#fff;font-size:13px;font-weight:600;text-decoration:none;font-family:'Inter',sans-serif;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            X (Twitter)
+          </a>
+          <a href="{_fb_url}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:10px;background:#1877f2;color:#fff;font-size:13px;font-weight:600;text-decoration:none;font-family:'Inter',sans-serif;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            Facebook
+          </a>
+          <a href="{_wa_url}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:10px;background:#25d366;color:#fff;font-size:13px;font-weight:600;text-decoration:none;font-family:'Inter',sans-serif;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            WhatsApp
+          </a>
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # Footer CTA
     st.markdown(f"""
     <div class="cta-footer">
       <p>Want to generate another blog?</p>
-      <span>Paste a new YouTube URL above and click Generate again — or check 📂 History to revisit past blogs.</span>
+      <span>Paste a new video URL above and click Generate again — or check 📂 History to revisit past blogs.</span>
     </div>
     """, unsafe_allow_html=True)
