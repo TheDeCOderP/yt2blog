@@ -104,6 +104,13 @@ div[data-testid="stRadio"] label p {{ color:{TEXT2} !important; }}
 .blog h2 {{ border-bottom:1px solid {BORDER} !important; }}
 .blog blockquote {{ background:rgba(124,58,237,.06) !important; color:{MUTED} !important; }}
 .blog strong {{ color:{TEXT} !important; }}
+.blog * {{ color:inherit !important; }}
+div.blog, div.blog p, div.blog li, div.blog span,
+div.blog h1, div.blog h2, div.blog h3, div.blog h4 {{
+  color:{TEXT2} !important;
+}}
+div.blog h1, div.blog h2, div.blog h3 {{ color:{TEXT} !important; }}
+div.blog strong, div.blog b {{ color:{TEXT} !important; }}
 .steps-card {{ background:{CARD}; border:1px solid {BORDER}; }}
 .steps-line {{ background:{BORDER}; }}
 .step-dot {{ background:{CHIP}; border:1.5px solid {CHIP_B}; color:{MUTED}; }}

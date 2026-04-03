@@ -120,6 +120,11 @@ div[data-testid="stRadio"] input[type="radio"] {
 .blog ul, .blog ol { padding-left: 18px !important; margin-bottom: 12px !important; }
 .blog li { margin-bottom: 4px !important; }
 .blog strong { font-weight: 700 !important; }
+/* force all markdown text inside .blog to inherit color from .blog div */
+.blog [data-testid="stMarkdownContainer"] p,
+.blog [data-testid="stMarkdownContainer"] li,
+.blog [data-testid="stMarkdownContainer"] span,
+.blog [data-testid="stMarkdownContainer"] { color: inherit !important; }
 .blog blockquote {
   border-left: 3px solid #7c3aed !important;
   padding: 8px 14px !important;
@@ -129,7 +134,6 @@ div[data-testid="stRadio"] input[type="radio"] {
 }
 .blog code {
   background: rgba(124,58,237,.1) !important;
-  color: #7c3aed !important;
   padding: 2px 6px !important;
   border-radius: 4px !important;
   font-size: 12px !important;
