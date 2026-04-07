@@ -162,10 +162,43 @@ def get_thumbnail_url(vid):
     return f"https://img.youtube.com/vi/{vid}/maxresdefault.jpg"
 
 def fetch_transcript(vid):
-    ytt = YouTubeTranscriptApi()
-    cookie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.txt")
-    if os.path.exists(cookie_path):
-        ytt = YouTubeTranscriptApi(cookie_path=cookie_path)
+    # Try Supadata API first (works on cloud servers)
+    supadata_key = os.getenv("SUPADATA_API_KEY")
+    if supadata_key:
+        try:
+            resp = requests.get(
+                f"https://api.supadata.ai/v1/youtube/transcript",
+                params={"videoId": vid, "text": "false"},
+                headers={"x-api-key": supadata_key},
+                timeout=30
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                content = data.get("content", [])
+                if content:
+                    class FakeEntry:
+                        def __init__(self, d): self.text = d.get("text", "")
+                    return [FakeEntry(e) for e in content]
+        except Exception:
+            pass
+
+    # Fallback to direct (works locally)
+    from youtube_transcript_api.proxies import WebshareProxyConfig, GenericProxyConfig
+    proxy_user = os.getenv("PROXY_USER")
+    proxy_pass = os.getenv("PROXY_PASS")
+    proxy_url  = os.getenv("PROXY_URL")
+
+    if proxy_user and proxy_pass:
+        ytt = YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
+            proxy_username=proxy_user, proxy_password=proxy_pass,
+        ))
+    elif proxy_url:
+        ytt = YouTubeTranscriptApi(proxy_config=GenericProxyConfig(
+            http_url=proxy_url, https_url=proxy_url,
+        ))
+    else:
+        ytt = YouTubeTranscriptApi()
+
     tlist = ytt.list(vid)
     try:
         transcript = tlist.find_transcript(['en','en-US','en-GB','hi','ur'])
