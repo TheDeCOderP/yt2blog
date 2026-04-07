@@ -163,6 +163,9 @@ def get_thumbnail_url(vid):
 
 def fetch_transcript(vid):
     ytt = YouTubeTranscriptApi()
+    cookie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.txt")
+    if os.path.exists(cookie_path):
+        ytt = YouTubeTranscriptApi(cookie_path=cookie_path)
     tlist = ytt.list(vid)
     try:
         transcript = tlist.find_transcript(['en','en-US','en-GB','hi','ur'])
